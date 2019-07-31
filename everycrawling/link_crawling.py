@@ -6,7 +6,7 @@ from collections import OrderedDict
 import datetime
 import time
 #import requests
-#import psycopg2
+import psycopg2
 
 # Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.100 Safari/537.36
 def remove_blank(s): #입력 스트링의 공백 제거
@@ -23,8 +23,8 @@ def init():
     chrome_option.add_argument('--headless')
     chrome_option.add_argument('--no-sandbox')
     chrome_option.add_argument('--disable-dev-shm-usage')
-    chrome_option.add_argument('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36')
-    driver = webdriver.Chrome('/usr/local/bin/chromedriver', options=chrome_option) #chrome driver 사용 및 headless 옵션 객체 적용
+    chrome_option.add_argument("user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.100 Safari/537.36")
+    driver = webdriver.Chrome('/app/everycrawling/chromedriver', options=chrome_option) #chrome driver 사용 및 headless 옵션 객체 적용
     driver.implicitly_wait(3) #랜더링 완료 시간 대기
     return driver
 
@@ -39,7 +39,7 @@ def init_firefox():
 
 def read_site_list():
     # f = open('data/movie/site_list.json',mode='r',encoding='utf-8')
-    f = open('data/site_list.json',mode='r',encoding='utf-8')
+    f = open('/app/everycrawling/everycrawling/site_list.json',mode='r',encoding='utf-8')
     json_site = json.load(f)
     site_list = json_site['site_list']
     f.close()
@@ -77,7 +77,7 @@ def search_title(driver, title, url, search_xpath):
     ##print(user_agent)
     driver.get(url) #default page에 접근
     ##print(driver)
-    html = requests.get(url).text
+    #html = requests.get(url).text
     ##print(html)
     elem = driver.find_element_by_xpath(search_xpath) # 메인 search name
     #elem = elem[0] #list object 상태에서는 바로 send Keys를 쓸 수 없다..
@@ -180,6 +180,10 @@ def get_data(driver, actor_xpath, summary_xpath):
 #Todo : 위에 cmp 체워 넣기, xpath 체워넣기, 테스트 코드 작성하기
 def body(site_list, movie_list):
     driver = init()
+    conn_string = "host = 'superson:5432' dbname ='crawling' user='superson' password='superson'"
+    conn = psycopg2.connect("dbname=crawling user=superson password=superson host=superson port=5432")
+    cur = conn.cursor()
+
     for movie in movie_list: # 영화 리스트 순회
         # title = movie['title']
         # contry = movie['contry']
@@ -246,7 +250,7 @@ def body(site_list, movie_list):
         json_file['site'] = link_list
         json_file = json.dumps(json_file,ensure_ascii=False)
         date = now.strftime('%Y%m%d%H%M%S')
-        check = title + ' ' + contry + ' ' + open_year + ' ' + start_year
+        identify = title + ' ' + contry + ' ' + open_year + ' ' + start_year
         # with open('data/movie/test/'+title+'_link.json', 'w', encoding='utf-8') as make_file:
         #with open('output/'+title+'_link.json', 'w', encoding='utf-8') as make_file:
         #    json.dump(json_file, make_file, ensure_ascii=False, indent="\t")
@@ -255,13 +259,12 @@ def body(site_list, movie_list):
         # conn_string = "host='localhost' dbname ='crawling' user='superson' password='superson'"
         # conn = psycopg2.connect(conn_string)
         # cur = conn.cursor()
-        # cur.execute("INSERT INTO rawdata (key, check, date, data)  VALUES (%s, %s, %s, %s)", (cid,check,date,json_file))
-        # conn.commit()
-        # cur.close()
-        # conn.close()
-        # time.sleep(1)
+        cur.execute("INSERT INTO rawdata_movie (doc_id, identify, date, data)  VALUES (%s, %s, %s, %s)", (cid,identify,date,json_file))
+        conn.commit()
+    cur.close()
+    conn.close()
     driver.quit()
-    return date
+    return 'success'
 
 def update_db(today):
     conn_string = "host='localhost' dbname ='crawling' user='superson' password='superson'"
@@ -271,4 +274,7 @@ def update_db(today):
     conn.commit()
     cur.close()
     conn.close()
-#body()
+
+site_list = read_site_list()
+movie_list = read_movie_list_test()
+body(site_list, movie_list)

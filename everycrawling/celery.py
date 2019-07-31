@@ -18,6 +18,11 @@ app.conf.update(
             'schedule': crontab(hour='*', minute='*'),
             'args': ()
         },
+        'test_crawling_schedule': {
+            'task': 'everycrawling.task.update_data',
+            'schedule': crontab(hour='*', minute='*'),
+            'args': ()
+        },
     }
 )
 # 장고 app config에 등록된 모든 taks 모듈을 불러온다.
