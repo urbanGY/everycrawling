@@ -2,6 +2,9 @@ import os
 from celery import Celery
 from celery.schedules import crontab
 
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+
 # `celery` 프로그램을 작동시키기 위한 기본 장고 세팅 값을 정한다.
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'everycrawling.settings')
 

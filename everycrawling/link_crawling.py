@@ -39,15 +39,15 @@ def init_firefox():
 
 def read_site_list():
     # f = open('data/movie/site_list.json',mode='r',encoding='utf-8')
-    f = open('/app/everycrawling/everycrawling/site_list.json',mode='r',encoding='utf-8')
+    f = open('site/site_list.json',mode='r',encoding='utf-8')
     json_site = json.load(f)
     site_list = json_site['site_list']
     f.close()
     return site_list
 
-def read_movie_list():
+def read_movie_list(num):
     # f = open('data/movie/input/test.txt',mode='r',encoding='utf-8')
-    f = open('movielist/movie_list_1.txt',mode='r',encoding='utf-8')
+    f = open('movielist/movie_list_'+num+'.txt',mode='r',encoding='utf-8')
     movie_list = []
     while True:
         line = f.readline()
@@ -65,10 +65,21 @@ def read_movie_list():
     return movie_list
 
 def read_movie_list_test():
-    #['어벤져스','미국','2012','2012'],
-    movie_list = [['엑시트','한국','2019','2018','123']]
-    #movie_list = [['페르세폴리스','프랑스','2008','2007','20080517']]
-    # movie_list = [['주사기','한국','','2018','20190667']]
+    f = open('movielist/test.txt',mode='r',encoding='utf-8')
+    movie_list = []
+    while True:
+        line = f.readline()
+        if not line:
+            break
+        _, cid, title, contry, open_year, start_year = line.split('|')
+        if len(open_year) == 8:
+            open_year = open_year[:4]
+        if len(start_year) == 1:
+            start_year = ''
+        else :
+            start_year = start_year[:4]
+        tmp = [title, contry, open_year, start_year, cid]
+        movie_list.append(tmp)
     return movie_list
 
 def search_title(driver, title, url, search_xpath):
@@ -178,7 +189,7 @@ def get_data(driver, actor_xpath, summary_xpath):
 #Todo : movie list 받아서 읽기 준비, movie list 3001 ~ 끝까지 크롤링하자
 #Todo : headless 있고 없고에 따라서 max movie를 받고 못받고가 정해지는데 뭐때문일까?
 #Todo : 위에 cmp 체워 넣기, xpath 체워넣기, 테스트 코드 작성하기
-def body(site_list, movie_list):
+def body(site_list, movie_list, job):
     driver = init()
     conn_string = "host = 'superson:5432' dbname ='crawling' user='superson' password='superson'"
     conn = psycopg2.connect("dbname=crawling user=superson password=superson host=superson port=5432")
@@ -210,7 +221,9 @@ def body(site_list, movie_list):
             score_xpath = site['score_xpath'] # 별점 접근 속성
             actor_xpath = site['actor_xpath'] # 배우 목록 접근
             summary_xpath = site['summary_xpath'] # 영화 내용
-            #search_title(driver, title, default_url, search_xpath)
+            if site_name == 'maxmovie':
+                continue
+	    #search_title(driver, title, default_url, search_xpath)
             #content_url = get_url(driver, title, contry ,open_year, start_year, title_xpath, check_xpath)
             try:
                 try: #기존 타이틀 명으로 검색
@@ -246,11 +259,11 @@ def body(site_list, movie_list):
         json_file = OrderedDict()
         json_file['doc_id'] = cid
         json_file['title'] = title
-        now = datetime.datetime.now()
         json_file['site'] = link_list
         json_file = json.dumps(json_file,ensure_ascii=False)
+        now = datetime.datetime.now()
         date = now.strftime('%Y%m%d%H%M%S')
-        identify = title + ' ' + contry + ' ' + open_year + ' ' + start_year
+        identify = title + '|' + contry + '|' + open_year + '|' + start_year
         # with open('data/movie/test/'+title+'_link.json', 'w', encoding='utf-8') as make_file:
         #with open('output/'+title+'_link.json', 'w', encoding='utf-8') as make_file:
         #    json.dump(json_file, make_file, ensure_ascii=False, indent="\t")
@@ -259,22 +272,113 @@ def body(site_list, movie_list):
         # conn_string = "host='localhost' dbname ='crawling' user='superson' password='superson'"
         # conn = psycopg2.connect(conn_string)
         # cur = conn.cursor()
-        cur.execute("INSERT INTO rawdata_movie (doc_id, identify, date, data)  VALUES (%s, %s, %s, %s)", (cid,identify,date,json_file))
+        if job == 'insert':
+            cur.execute("INSERT INTO rawdata_movie (doc_id, identify, date, data)  VALUES (%s, %s, %s, %s)", (cid,identify,date,json_file))
+        elif job == 'test':
+            cur.execute("INSERT INTO test (doc_id, identify, date, data)  VALUES (%s, %s, %s, %s)", (cid,identify,date,json_file))
+        elif job == 'update':
+            cur.execute("UPDATE test SET date = '"+date+"' where doc_id = '"+cid+"'") #TODO : update되는 칼럼은 date , data 두개임으로 후에 수정한다
+            json_file = make_refine_json(json_file)
+            cur.execute("INSERT INTO test_refine (doc_id, mid, data)  VALUES (%s, %s, %s)", (cid,"000",json_file))
+
+         #TODO : 여기에 refine 커밋해버리는 코드도 작성해버리자 위에 인서트 부분에
         conn.commit()
     cur.close()
     conn.close()
     driver.quit()
     return 'success'
 
-def update_db(today):
-    conn_string = "host='localhost' dbname ='crawling' user='superson' password='superson'"
-    conn = psycopg2.connect(conn_string)
+def get_update_list():
+    conn = psycopg2.connect("dbname=crawling user=superson password=superson host=superson port=5432")
     cur = conn.cursor()
-    cur.execute("SELECT check FROM rawdata WHERE data < today;")
+    now = datetime.datetime.now()
+    today = now.strftime('%Y%m%d%H%M%S') #TODO : 주기정도에 따라서 - 30일? 15일 전의 날짜를 반환하도록!
+    #today = '20190801145132'
+    cur.execute("SELECT doc_id, identify FROM test WHERE date < '"+today+"'")
+    result  = cur.fetchall()
     conn.commit()
     cur.close()
     conn.close()
+    movie_list = []
+    for data in result:
+        doc_id = data[0]
+        title, contry, open_year, start_year = data[1].split('|')
+        tmp = [title,contry,open_year,start_year,doc_id]
+        movie_list.append(tmp)
+    return movie_list
 
-site_list = read_site_list()
-movie_list = read_movie_list_test()
-body(site_list, movie_list)
+def update_raw(doc_id):
+    conn = psycopg2.connect("dbname=crawling user=superson password=superson host=superson port=5432")
+    cur = conn.cursor()
+    now = datetime.datetime.now()
+    cur.execute("SELECT doc_id, identify FROM test WHERE doc_id = '"+doc_id+"'")
+    result  = cur.fetchall()
+    conn.commit()
+    cur.close()
+    conn.close()
+    movie_list = []
+    for data in result:
+        doc_id = data[0]
+        title, contry, open_year, start_year = data[1].split('|')
+        tmp = [title,contry,open_year,start_year,doc_id]
+        movie_list.append(tmp)
+    site_list = read_site_list()
+    body(site_list, movie_list, 'update')
+    return 'update finish'
+
+def make_refine_json(json_data):
+    refine_json = OrderedDict()
+    json_data = json.loads(json_data)
+    site_data = json_data['site']
+    list = []
+    flag = True
+    for site in site_data:
+        tmp = OrderedDict()
+        tmp['site_name'] = site['site_name']
+        tmp['url'] = site['url']
+        tmp['rating'] = site['rating']
+        tmp['review'] = site['review']
+        list.append(tmp)
+        if flag:
+            info = site['data']
+            flag = False
+
+    data_part = OrderedDict()
+    data_part['doc_id'] = json_data['doc_id']
+    data_part['title'] = json_data['title']
+    tmp = OrderedDict()
+    if not flag:
+        data_part['category'] = info['category']
+        tmp['actor'] = info['actor']
+        tmp['summary'] = info['summary']
+    data_part['info'] = tmp
+    refine_json['data'] = data_part
+    refine_json['site'] = list
+    refine_json = json.dumps(refine_json,ensure_ascii=False)
+    return refine_json
+
+
+#
+def update_refine(doc_id):
+    conn = psycopg2.connect("dbname=crawling user=superson password=superson host=superson port=5432")
+    cur = conn.cursor()
+    now = datetime.datetime.now()
+    cur.execute("SELECT data FROM test WHERE doc_id = '"+doc_id+"'")
+    result  = cur.fetchall()
+    conn.commit()
+    for data in result:
+        json_data = make_refine_json(data[0])
+        cur.execute("UPDATE test_refine SET data = '"+json_data+"' where doc_id = '"+doc_id+"'")
+        conn.commit()
+    cur.close()
+    conn.close()
+    return 'insert refine finish'
+#for i in range(1,4):
+
+#site_list = read_site_list()
+#movie_list = read_movie_list_test()
+#body(site_list, movie_list, 'test')
+#movie_list = get_update_list()
+#body(site_list, movie_list, 'update')
+update_raw('20113557')
+print('******* finish ********')
