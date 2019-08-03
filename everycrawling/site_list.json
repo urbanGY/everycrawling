@@ -3,10 +3,9 @@
       {
           "site_name" : "watcha",
           "scale_type" : "5",
-          "site_url" : "https://watcha.com/ko-KR",
-          "search_xpath" : "//*[@id=\"search_bar_in_home\"]",
+          "search_url" : "https://movie.naver.com/movie/search/result.nhn?query=<TITLE>&section=all&ie=utf8",
           "title_xpath" :  "//*[@id=\"root\"]/div/div[1]/section/section/section[2]/div[2]/div[1]/div/div/div/ul/li[@*]/a",
-          "check_xpath" : "//*[@id=\"root\"]/div/div[1]/section/section/section[2]/div[2]/div[1]/div/div/div/ul/li[@*]/a",
+          "identify_xpath" : "//*[@id=\"root\"]/div/div[1]/section/section/section[2]/div[2]/div[1]/div/div/div/ul/li[@*]/a",
           "score_xpath" : "//*[@id=\"root\"]/div/div[1]/section/div/div/div/section/div[2]/div/div/div/div/div[2]",
           "actor_xpath" : "//*[@id=\"root\"]/div/div[1]/section/div/div/div/div/div/div[1]/div[1]/div/div/section[@*]/div[2]/div[1]/div/div/div/ul/li[@*]/a/div[2]/div[1]/div[1]",
           "summary_xpath" : "//*[@id=\"root\"]/div/div[1]/section/div/div/div/div/div/div[1]/div[1]/div/div/section[@*]/div[2]/div/article/div[2]/div"
@@ -41,7 +40,7 @@
           "title_xpath" : "//*[@id=\"contents\"]/div[1]/div[2]/div/ul/li[not(@*)]/div/p[1]/a",
           "check_xpath" : "//*[@id=\"contents\"]/div[1]/div[2]/div/ul/li[not(@*)]/div/p[2]",
           "score_xpath" : "//*[@id=\"stab1\"]/div[1]/p[1]",
-          "actor_xpath" : "//*[@id=\"tab1\"]/div[1]/div[@*]/div/ul/li[not(@*)]/div/p[2]",                    
+          "actor_xpath" : "//*[@id=\"tab1\"]/div[1]/div[@*]/div/ul/li[not(@*)]/div/p[2]",
           "summary_xpath" : "//*[@id=\"content\"]/div[1]/div[2]/div[1]/div/div[2]/span/span"
       }
   ]
