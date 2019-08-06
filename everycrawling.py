@@ -2,7 +2,8 @@ import requests
 from lxml import html
 import json
 import logging
-
+import datetime
+import uuid
 
 
 def log_init():
@@ -15,6 +16,7 @@ def read_site(name):
     json_site = json.load(f)
     site_list = json_site['site_list']
     f.close()
+    site = site_list
     for s in site_list:
         if name == s['site_name']:
             site = s
@@ -135,10 +137,10 @@ def get_data(url, site_data):
     summary_xpath = site_data['summary_xpath']
     summary = get_summary(tree, summary_xpath)
 
-    raw_data = score + '\n'
-    raw_data += actor + '\n'
-    raw_data += poster + '\n'
-    raw_data += summary + '\n'
+    raw_data = score + '|'
+    raw_data += actor + '|'
+    raw_data += poster + '|'
+    raw_data += summary
     return raw_data
 
 def get_score(tree, score_xpath, score_scale):
@@ -179,7 +181,10 @@ def extract_actor(a):
 
 def get_poster(tree, poster_xpath):
     poster = tree.xpath(poster_xpath)
-    poster = poster[0].attrib['src']    
+    try:
+        poster = poster[0].attrib['src']
+    except:
+        poster = 'not exist'
     return poster
 
 def get_summary(tree, summary_xpath):
@@ -188,20 +193,76 @@ def get_summary(tree, summary_xpath):
     return summary
 
 #**************************************************************
+#uuid.uuid4()
+
+def get_source_id(url):
+    for i in range(len(url)-1,0,-1):
+        if url[i] == '/' or url[i] == '=':
+            break
+    source_id = url[i+1:len(url)]
+    return source_id
+
+def get_date():
+    now = datetime.datetime.now()
+    date = now.strftime('%Y%m%d%H%M')
+    return date
+
+def request_recovery(url, site):
+    header = get_header()
+    list = [header, url, site]
+    return list
+
+#**************************************************************
+
+# db 속성 : uuid site id createdate data 요청 복구
 def test():
     log_init()
     category = 'movie'
-    site = read_site('watcha')
+    site = read_site('maxmovie')
     input = read_input(category,'test')
     for n in input:
-        content_url = get_url(site, n)
-        print(content_url)
-        raw_data = get_data(content_url, site)
-        print(raw_data)
         try:
-            print('gg')
+            content_url = get_url(site, n)
+            raw_data = get_data(content_url, site)
+
+            uid = uuid.uuid4()
+            source_site = site['site_name']
+            source_id = get_source_id(content_url)
+            date = get_date()
+            recovery = request_recovery(content_url, site)
+
         except Exception as e:
             logging.error('Exception while <'+ site['site_name']+'> searching <'+ n +'> '+ str(e))
             logging.exception('Got exception on main handler')
             continue
-test()
+
+def make_request():
+    log_init()
+    category = 'movie'
+    sites = read_site('all')
+    input = read_input(category, 'filename')
+    for movie in input:
+        uid = uuid.uuid4()
+        for site in sites:
+            try:
+                content_url = get_url(site, movie)
+                raw_data = get_data(content_url, site)
+                source_site = site['site_name']
+                source_id = get_source_id(content_url)
+                date = get_date()
+                recovery = request_recovery(content_url, site)
+
+                print('uid : ',uid)
+                print('source_site : ',source_site)
+                print('source_id : ',source_id)
+                print('date : ',date)
+                print('data : ',raw_data)
+                print('recovery : ',recovery)                
+                print('')
+
+            except Exception as e:
+                logging.error('Exception while <'+ site['site_name']+'> searching <'+ movie +'> '+ str(e))
+                logging.exception('Got exception on main handler')
+                continue
+
+make_request()
