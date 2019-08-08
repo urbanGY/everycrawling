@@ -1,16 +1,11 @@
 import requests
 from lxml import html
 import json
-import logging
+from collections import OrderedDict #for make json
 import datetime
-import uuid
-
-
-def log_init():
-    logging.basicConfig(filename='./log/test.log',format='%(asctime)s %(levelname)-8s %(message)s', level=logging.DEBUG , datefmt='%Y-%m-%d %H:%M:%S')
-
+from time import sleep
 #*********************************************************************
-
+# for load input data
 def read_site(name):
     f = open('site/site_list.json', mode='r', encoding='utf-8')
     json_site = json.load(f)
@@ -21,30 +16,28 @@ def read_site(name):
         if name == s['site_name']:
             site = s
     return site
-#print(read_site('watcha'))
 
 def read_input(category,file_name):
-    # f = open('movielist/'+category+'/'+file_name+'.txt',mode='r',encoding='utf-8')
-    # input_list = []
-    # while True:
-    #     line = f.readline()
-    #     if not line:
-    #         break
-    #     _, cid, title, contry, open_year, start_year = line.split('|')
-    #     if len(open_year) == 8:
-    #         open_year = open_year[:4]
-    #     if len(start_year) == 1:
-    #         start_year = ''
-    #     else :
-    #         start_year = start_year[:4]
-    #     tmp = cid + '|' + title + '|' + contry + '|' + open_year + '|' + start_year
-    #     input_list.append(tmp)
-    # f.close()
-    return ['000|엑시트|한국|2019|2018']
-    #return input_list
+    f = open('input/'+category+'/'+file_name+'.txt',mode='r',encoding='utf-8')
+    input_list = []
+    while True:
+        line = f.readline()
+        if not line:
+            break
+        _, cid, title, contry, open_year, start_year = line.split('|')
+        if len(open_year) == 8:
+            open_year = open_year[:4]
+        if len(start_year) == 1:
+            start_year = ''
+        else :
+            start_year = start_year[:4]
+        tmp = cid + '|' + title + '|' + contry + '|' + open_year + '|' + start_year
+        input_list.append(tmp)
+    f.close()
+    return input_list
 
 #*************************************************************
-
+# for get content_url.. get_url() func
 def get_url(site_data, input_data):
     url = site_data['search_url']
     title_xpath = site_data['title_xpath']
@@ -119,7 +112,7 @@ def make_full_url(site, content_url):
     return content_url
 
 #*************************************************************
-
+# for make raw_data.. get_data() func
 def get_data(url, site_data):
     page = requests.get(url, headers = get_header())
     tree = html.fromstring(page.content)
@@ -145,10 +138,107 @@ def get_data(url, site_data):
 
 def get_score(tree, score_xpath, score_scale):
     score = tree.xpath(score_xpath)
-    score = score[0].text_content()
-    #score = extract_score(score)
-    #score = score_scaling(score, score_scale)
+    try:
+        score = score[0].text_content()
+    except:
+        score = 'score not exist'
     return score
+
+def get_actor(tree, actor_xpath):
+    actor = tree.xpath(actor_xpath)
+    actor = extract_actor(actor)
+    return actor
+
+def extract_actor(a):
+    actor_list = []
+    for actor in a:
+        actor_list.append(actor.text_content())
+    return str(actor_list)
+
+def get_poster(tree, poster_xpath):
+    poster = tree.xpath(poster_xpath)
+    try:
+        poster = poster[0].attrib['src']
+    except:
+        poster = 'poster not exist'
+    return poster
+
+def get_summary(tree, summary_xpath):
+    summary = tree.xpath(summary_xpath)
+    summary = summary[0].text_content()
+    return summary
+
+#**************************************************************
+#for raw_data attribute
+
+def get_source_id(url):
+    for i in range(len(url)-1,0,-1):
+        if url[i] == '/' or url[i] == '=':
+            break
+    source_id = url[i+1:len(url)]
+    return source_id
+
+def get_date():
+    now = datetime.datetime.now()
+    date = now.strftime('%Y%m%d%H%M')
+    return date
+
+def request_recovery(movie, url, site):
+    header = get_header()
+    list = [movie, header, url, site]
+    return str(list)
+
+#**************************************************************
+# for make json
+def make_json(list):
+    for tup in list:
+        source_site = tup[0]
+        rawdata = tup[1]
+        score, actor_list, poster, summary = rawdata.split('|')
+    #json 폼으로 만들기!!
+    {
+        "data":{
+            "doc_id":"20113557",
+            "title":"범죄와의 전쟁: 나쁜놈들 전성시대",
+            "category":"movie",
+            "info":{
+                "poster_url":"https://dhgywazgeek0d.cloudfront.net/watcha/image/upload/c_fill,h_400,q_80,w_280/v1466077889/oybh6wd5sokcttwcaywt.jpg",
+                "actor":[
+                    "윤종빈",
+                    "최민식",
+                    "하정우",
+                    "조진웅",
+                    "곽도원",
+                    "김성 균",
+                    "마동석",
+                    "김혜은",
+                    "송영창"
+                ],
+            "summary":"1982년 부산. 해고될 위기에 처한 비리 세관원 최익현(최민식)은 순찰 중 적발한 히로뽕을 일본으로 밀수출, 마지막으로 한 탕 하기 위해 부산 최대 조직의 젊은 보스 최형배(하정우)와 손을 잡는다. 익현은 탁월한 임기응변과 특유의 친화력으로…"
+            }
+        },
+        "site":[
+            {
+                "site_name":"watcha",
+                "url":"https://watcha.com/ko-KR/contents/mWv1lb5",
+                "rating":"8.0",
+                "review":"review"
+            },
+            {
+                "site_name":"naver_movie",
+                "url":"https://movie.naver.com/movie/bi/mi/basic.nhn?code=82540",
+                "rating":"8.6",
+                "review":"review"
+            },
+            {
+                "site_name":"daum_movie",
+                "url":"http://movie.daum.net/moviedb/mai n?movieId=63114",
+                "rating":"8.3",
+                "review":"review"
+            }
+        ]
+    }
+    return json_form
 
 def extract_score(s):
     score = s
@@ -168,101 +258,36 @@ def score_scaling(score, scale):
         score = tmp
     return str(score)
 
-def get_actor(tree, actor_xpath):
-    actor = tree.xpath(actor_xpath)
-    actor = extract_actor(actor)
-    return actor
-
-def extract_actor(a):
-    actor_list = []
-    for actor in a:
-        actor_list.append(actor.text_content())
-    return str(actor_list)
-
-def get_poster(tree, poster_xpath):
-    poster = tree.xpath(poster_xpath)
-    try:
-        poster = poster[0].attrib['src']
-    except:
-        poster = 'not exist'
-    return poster
-
-def get_summary(tree, summary_xpath):
-    summary = tree.xpath(summary_xpath)
-    summary = summary[0].text_content()
-    return summary
-
 #**************************************************************
-#uuid.uuid4()
-
-def get_source_id(url):
-    for i in range(len(url)-1,0,-1):
-        if url[i] == '/' or url[i] == '=':
-            break
-    source_id = url[i+1:len(url)]
-    return source_id
-
-def get_date():
-    now = datetime.datetime.now()
-    date = now.strftime('%Y%m%d%H%M')
-    return date
-
-def request_recovery(url, site):
-    header = get_header()
-    list = [header, url, site]
-    return list
-
-#**************************************************************
-
 # db 속성 : uuid site id createdate data 요청 복구
 def test():
-    log_init()
-    category = 'movie'
-    site = read_site('maxmovie')
-    input = read_input(category,'test')
-    for n in input:
-        try:
-            content_url = get_url(site, n)
-            raw_data = get_data(content_url, site)
-
-            uid = uuid.uuid4()
-            source_site = site['site_name']
-            source_id = get_source_id(content_url)
-            date = get_date()
-            recovery = request_recovery(content_url, site)
-
-        except Exception as e:
-            logging.error('Exception while <'+ site['site_name']+'> searching <'+ n +'> '+ str(e))
-            logging.exception('Got exception on main handler')
-            continue
-
-def make_request():
-    log_init()
+    import logging
+    logging.basicConfig(filename='./log/test.log',format='%(asctime)s %(levelname)-8s %(message)s', level=logging.DEBUG , datefmt='%Y-%m-%d %H:%M:%S')
     category = 'movie'
     sites = read_site('all')
-    input = read_input(category, 'filename')
+    # input = ['000|엑시트|한국|2019|2018']
+    # 20182407|우리의 소원|한국||2018 #매치 에러 이거 해결
+    input = ['20192601|작은 방안의 소녀|한국||2018'] #스코어 에러
     for movie in input:
-        uid = uuid.uuid4()
+        sleep(1)
         for site in sites:
             try:
                 content_url = get_url(site, movie)
+                print('url : ',content_url)
                 raw_data = get_data(content_url, site)
                 source_site = site['site_name']
                 source_id = get_source_id(content_url)
                 date = get_date()
-                recovery = request_recovery(content_url, site)
-
-                print('uid : ',uid)
+                recovery = request_recovery(movie, content_url, site)
                 print('source_site : ',source_site)
                 print('source_id : ',source_id)
                 print('date : ',date)
                 print('data : ',raw_data)
-                print('recovery : ',recovery)                
+                print('recovery : ',recovery)
                 print('')
-
             except Exception as e:
                 logging.error('Exception while <'+ site['site_name']+'> searching <'+ movie +'> '+ str(e))
-                logging.exception('Got exception on main handler')
+                logging.exception('Got exception')
+                logging.error('**********************************')
                 continue
-
-make_request()
+#test()
