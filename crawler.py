@@ -118,8 +118,7 @@ def get_data(url, site_data):
     tree = html.fromstring(page.content)
 
     score_xpath = site_data['score_xpath']
-    score_scale = site_data['scale_type']
-    score = get_score(tree, score_xpath, score_scale)
+    score = get_score(tree, score_xpath)
 
     actor_xpath = site_data['actor_xpath']
     actor = get_actor(tree, actor_xpath)
@@ -136,12 +135,12 @@ def get_data(url, site_data):
     raw_data += summary
     return raw_data
 
-def get_score(tree, score_xpath, score_scale):
+def get_score(tree, score_xpath):
     score = tree.xpath(score_xpath)
     try:
         score = score[0].text_content()
     except:
-        score = 'score not exist'
+        score = '0.0'
     return score
 
 def get_actor(tree, actor_xpath):
@@ -190,55 +189,81 @@ def request_recovery(movie, url, site):
 
 #**************************************************************
 # for make json
-def make_json(list):
+def make_json(uuid, list):
+    import ast
+    poster_url = ''
+    max_summary = ''
+    max_actor = ['']
+    title = ''
+
+    site_info_list = []
     for tup in list:
         source_site = tup[0]
         rawdata = tup[1]
+        recovery = tup[2]
+        recovery = ast.literal_eval(recovery)
+
+        identify = recovery[0]
+        url = recovery[2]
+        site_ = recovery[3]
+        score_scale = site_['scale_type']
+
         score, actor_list, poster, summary = rawdata.split('|')
-    #json 폼으로 만들기!!
-    {
-        "data":{
-            "doc_id":"20113557",
-            "title":"범죄와의 전쟁: 나쁜놈들 전성시대",
-            "category":"movie",
-            "info":{
-                "poster_url":"https://dhgywazgeek0d.cloudfront.net/watcha/image/upload/c_fill,h_400,q_80,w_280/v1466077889/oybh6wd5sokcttwcaywt.jpg",
-                "actor":[
-                    "윤종빈",
-                    "최민식",
-                    "하정우",
-                    "조진웅",
-                    "곽도원",
-                    "김성 균",
-                    "마동석",
-                    "김혜은",
-                    "송영창"
-                ],
-            "summary":"1982년 부산. 해고될 위기에 처한 비리 세관원 최익현(최민식)은 순찰 중 적발한 히로뽕을 일본으로 밀수출, 마지막으로 한 탕 하기 위해 부산 최대 조직의 젊은 보스 최형배(하정우)와 손을 잡는다. 익현은 탁월한 임기응변과 특유의 친화력으로…"
-            }
-        },
-        "site":[
-            {
-                "site_name":"watcha",
-                "url":"https://watcha.com/ko-KR/contents/mWv1lb5",
-                "rating":"8.0",
-                "review":"review"
-            },
-            {
-                "site_name":"naver_movie",
-                "url":"https://movie.naver.com/movie/bi/mi/basic.nhn?code=82540",
-                "rating":"8.6",
-                "review":"review"
-            },
-            {
-                "site_name":"daum_movie",
-                "url":"http://movie.daum.net/moviedb/mai n?movieId=63114",
-                "rating":"8.3",
-                "review":"review"
-            }
-        ]
-    }
-    return json_form
+        _, title, contry, open_year, start_year = identify.split('|')
+
+        poster_url = poster
+        summary = remove_blank(summary) #앞뒤 과도한 공백 제거
+        max_summary = get_max_summary(summary, max_summary)
+        max_actor = get_max_actor(ast.literal_eval(actor_list), max_actor)
+
+        score = extract_score(score) #점수 추출
+        score = score_scaling(score, score_scale) #점수 점수 normalize
+
+        tmp = OrderedDict()
+        tmp['site_name'] = source_site
+        tmp['url'] = url
+        tmp['rating'] = score
+        site_info_list.append(tmp)
+
+    info_part = OrderedDict() #poster, actor, summary
+    info_part['poster_url'] = poster_url
+    info_part['actor'] = max_actor
+    info_part['summary'] = max_summary
+
+    data_part = OrderedDict()
+    data_part['uuid'] = uuid
+    data_part['title'] = title
+    data_part['info'] = info_part
+
+    json_form = OrderedDict()
+    json_form['data'] = data_part
+    json_form['site'] = site_info_list
+    return json.dumps(json_form,ensure_ascii=False)
+
+
+def remove_blank(s): # 9 10 32 앞 뒤에 있는 과도한 공백들 제거
+    for front in range(0,len(s)):
+        if not (ord(s[front]) is 9 or ord(s[front]) is 10 or ord(s[front]) is 32):
+            break
+
+    for tail in range(len(s)-1,0,-1):
+        if not (ord(s[tail]) is 9 or ord(s[tail]) is 10 or ord(s[tail]) is 32):
+            break
+
+    s = s[front:tail+1]
+    return s
+
+def get_max_summary(summary, max):
+    if len(summary) > len(max):
+        max = summary
+    return max
+
+def get_max_actor(actor, max):
+    if actor[0] == '왓챠플레이':
+        actor = actor[1:len(actor)]
+    if len(actor) > len(max):
+        max = actor
+    return max
 
 def extract_score(s):
     score = s
@@ -265,9 +290,9 @@ def test():
     logging.basicConfig(filename='./log/test.log',format='%(asctime)s %(levelname)-8s %(message)s', level=logging.DEBUG , datefmt='%Y-%m-%d %H:%M:%S')
     category = 'movie'
     sites = read_site('all')
-    # input = ['000|엑시트|한국|2019|2018']
-    # 20182407|우리의 소원|한국||2018 #매치 에러 이거 해결
-    input = ['20192601|작은 방안의 소녀|한국||2018'] #스코어 에러
+    input = ['000|엑시트|한국|2019|2018']
+    # 20182407|우리의 소원|한국||2018 #매치 에러 이거 해결 **
+    # input = ['20192601|작은 방안의 소녀|한국||2018'] #스코어 에러 **
     for movie in input:
         sleep(1)
         for site in sites:
@@ -279,6 +304,7 @@ def test():
                 source_id = get_source_id(content_url)
                 date = get_date()
                 recovery = request_recovery(movie, content_url, site)
+
                 print('source_site : ',source_site)
                 print('source_id : ',source_id)
                 print('date : ',date)
@@ -290,4 +316,4 @@ def test():
                 logging.exception('Got exception')
                 logging.error('**********************************')
                 continue
-#test()
+
