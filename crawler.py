@@ -113,59 +113,9 @@ def make_full_url(site, content_url):
 
 #*************************************************************
 # for make raw_data.. get_data() func
-def get_data(url, site_data):
-    page = requests.get(url, headers = get_header())
-    tree = html.fromstring(page.content)
-
-    score_xpath = site_data['score_xpath']
-    score = get_score(tree, score_xpath)
-
-    actor_xpath = site_data['actor_xpath']
-    actor = get_actor(tree, actor_xpath)
-
-    poster_xpath = site_data['poster_xpath']
-    poster = get_poster(tree, poster_xpath)
-
-    summary_xpath = site_data['summary_xpath']
-    summary = get_summary(tree, summary_xpath)
-
-    raw_data = score + '|'
-    raw_data += actor + '|'
-    raw_data += poster + '|'
-    raw_data += summary
-    return raw_data
-
-def get_score(tree, score_xpath):
-    score = tree.xpath(score_xpath)
-    try:
-        score = score[0].text_content()
-    except:
-        score = '0.0'
-    return score
-
-def get_actor(tree, actor_xpath):
-    actor = tree.xpath(actor_xpath)
-    actor = extract_actor(actor)
-    return actor
-
-def extract_actor(a):
-    actor_list = []
-    for actor in a:
-        actor_list.append(actor.text_content())
-    return str(actor_list)
-
-def get_poster(tree, poster_xpath):
-    poster = tree.xpath(poster_xpath)
-    try:
-        poster = poster[0].attrib['src']
-    except:
-        poster = 'poster not exist'
-    return poster
-
-def get_summary(tree, summary_xpath):
-    summary = tree.xpath(summary_xpath)
-    summary = summary[0].text_content()
-    return summary
+def get_raw_data(url):
+    page = requests.get(url, headers = get_header()).text
+    return page
 
 #**************************************************************
 #for raw_data attribute
@@ -182,42 +132,40 @@ def get_date():
     date = now.strftime('%Y%m%d%H%M')
     return date
 
-def request_recovery(movie, url, site):
+def request_recovery(category, identify, url, site):
     header = get_header()
-    list = [movie, header, url, site]
+    list = [category, identify, header, url, site]
     return str(list)
 
 #**************************************************************
 # for make json
 def make_json(uuid, list):
     import ast
-    poster_url = ''
+    poster = ''
     max_summary = ''
     max_actor = ['']
     title = ''
 
     site_info_list = []
     for tup in list:
-        source_site = tup[0]
-        rawdata = tup[1]
+        source_site = tup[0] #naver, daum..
+        rawdata = tup[1] #html
         recovery = tup[2]
-        recovery = ast.literal_eval(recovery)
+        recovery = ast.literal_eval(recovery) #string form list ro list
 
-        identify = recovery[0]
-        url = recovery[2]
-        site_ = recovery[3]
-        score_scale = site_['scale_type']
+        category = recovery[0]
+        identify = recovery[1]
+        url = recovery[3]
+        site = recovery[4]
 
-        score, actor_list, poster, summary = rawdata.split('|')
+        score, actor_list, poster_url, summary = get_data(rawdata, site)
         _, title, contry, open_year, start_year = identify.split('|')
 
-        poster_url = poster
-        summary = remove_blank(summary) #앞뒤 과도한 공백 제거
-        max_summary = get_max_summary(summary, max_summary)
-        max_actor = get_max_actor(ast.literal_eval(actor_list), max_actor)
+        if source_site == 'naver_movie':
+            poster = poster_url
 
-        score = extract_score(score) #점수 추출
-        score = score_scaling(score, score_scale) #점수 점수 normalize
+        max_summary = get_max_summary(summary, max_summary)
+        max_actor = get_max_actor(actor_list, max_actor)
 
         tmp = OrderedDict()
         tmp['site_name'] = source_site
@@ -226,12 +174,13 @@ def make_json(uuid, list):
         site_info_list.append(tmp)
 
     info_part = OrderedDict() #poster, actor, summary
-    info_part['poster_url'] = poster_url
+    info_part['poster_url'] = poster
     info_part['actor'] = max_actor
     info_part['summary'] = max_summary
 
     data_part = OrderedDict()
     data_part['uuid'] = uuid
+    data_part['category'] = category
     data_part['title'] = title
     data_part['info'] = info_part
 
@@ -240,30 +189,45 @@ def make_json(uuid, list):
     json_form['site'] = site_info_list
     return json.dumps(json_form,ensure_ascii=False)
 
-
-def remove_blank(s): # 9 10 32 앞 뒤에 있는 과도한 공백들 제거
-    for front in range(0,len(s)):
-        if not (ord(s[front]) is 9 or ord(s[front]) is 10 or ord(s[front]) is 32):
-            break
-
-    for tail in range(len(s)-1,0,-1):
-        if not (ord(s[tail]) is 9 or ord(s[tail]) is 10 or ord(s[tail]) is 32):
-            break
-
-    s = s[front:tail+1]
-    return s
-
 def get_max_summary(summary, max):
     if len(summary) > len(max):
         max = summary
     return max
 
 def get_max_actor(actor, max):
-    if actor[0] == '왓챠플레이':
-        actor = actor[1:len(actor)]
     if len(actor) > len(max):
         max = actor
     return max
+
+def get_data(page, site_data):
+    tree = html.fromstring(page)
+
+    score_xpath = site_data['score_xpath']
+    score_scale = site_data['scale_type']
+    score = get_score(tree, score_xpath)
+    score = extract_score(score)
+    score = score_scaling(score, score_scale)
+
+    actor_xpath = site_data['actor_xpath']
+    actor = get_actor(tree, actor_xpath)
+
+    poster_xpath = site_data['poster_xpath']
+    poster = get_poster(tree, poster_xpath)
+
+    summary_xpath = site_data['summary_xpath']
+    summary = get_summary(tree, summary_xpath)
+    summary = remove_blank(summary)
+
+    return score, actor, poster, summary
+
+def get_score(tree, score_xpath):
+    score = tree.xpath(score_xpath)
+    try:
+        score = score[0].text_content()
+    except:
+        score = '0.0'
+
+    return score
 
 def extract_score(s):
     score = s
@@ -283,6 +247,46 @@ def score_scaling(score, scale):
         score = tmp
     return str(score)
 
+def get_actor(tree, actor_xpath):
+    actor = tree.xpath(actor_xpath)
+    actor = extract_actor(actor)
+    return actor
+
+def extract_actor(a):
+    actor_list = []
+    for actor in a:
+        actor_list.append(actor.text_content())
+    if len(actor_list) > 0 and actor_list[0] == '왓챠플레이':
+        actor_list = actor_list[1:len(actor_list)]
+    return actor_list
+
+def get_poster(tree, poster_xpath):
+    poster = tree.xpath(poster_xpath)
+    try:
+        poster = poster[0].attrib['src']
+    except:
+        poster = 'poster not exist'
+    return poster
+
+def get_summary(tree, summary_xpath):
+    summary = tree.xpath(summary_xpath)
+    try:
+        summary = summary[0].text_content()
+    except:
+        summary = 'summary not exist'
+    return summary
+
+def remove_blank(s): # 9 10 32 앞 뒤에 있는 과도한 공백들 제거
+    for front in range(0,len(s)):
+        if not (ord(s[front]) is 9 or ord(s[front]) is 10 or ord(s[front]) is 32):
+            break
+
+    for tail in range(len(s)-1,0,-1):
+        if not (ord(s[tail]) is 9 or ord(s[tail]) is 10 or ord(s[tail]) is 32):
+            break
+
+    s = s[front:tail+1]
+    return s
 #**************************************************************
 # db 속성 : uuid site id createdate data 요청 복구
 def test():
@@ -299,7 +303,8 @@ def test():
             try:
                 content_url = get_url(site, movie)
                 print('url : ',content_url)
-                raw_data = get_data(content_url, site)
+                raw_data = get_raw_data(content_url)
+                data = get_data(raw_data, site)
                 source_site = site['site_name']
                 source_id = get_source_id(content_url)
                 date = get_date()
@@ -308,7 +313,8 @@ def test():
                 print('source_site : ',source_site)
                 print('source_id : ',source_id)
                 print('date : ',date)
-                print('data : ',raw_data)
+                print('raw data : ',raw_data)
+                print('data : ',data)
                 print('recovery : ',recovery)
                 print('')
             except Exception as e:
@@ -316,4 +322,4 @@ def test():
                 logging.exception('Got exception')
                 logging.error('**********************************')
                 continue
-
+#test()
