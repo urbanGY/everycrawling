@@ -28,15 +28,13 @@ class Rawdata(Base):
 class RefinedData(Base):
     __tablename__ = 'wiki_refineddata'
 
-    id = Column(Integer, primary_key=True)
-    uuid = Column(UUID(as_uuid=True))
-    page_id = Column(Integer)
+    uuid = Column(UUID(as_uuid=True), primary_key=True)
+    page_id = Column(Integer, nullable=True)
     update_date = Column(DateTime(timezone=True))
-    json = Column(JSONB)
+    data = Column(JSONB)
 
-    def __init__(self, uuid, page_id, json):
-        self.id = ''
+    def __init__(self, uuid, json):
         self.uuid = uuid
-        self.page_id = page_id
+        self.page_id = None
         self.update_date = func.now()
-        self.json = json
+        self.data = json
