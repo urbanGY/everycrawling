@@ -175,6 +175,10 @@ def make_json(uuid, list):
 
     info_part = OrderedDict() #poster, actor, summary
     info_part['poster_url'] = poster
+    if len(max_actor) > 0:
+        info_part['director'] = max_actor[0]
+    else :
+        info_part['director'] = ''    
     info_part['actor'] = max_actor
     info_part['summary'] = max_summary
 
@@ -187,7 +191,8 @@ def make_json(uuid, list):
     json_form = OrderedDict()
     json_form['data'] = data_part
     json_form['site'] = site_info_list
-    return json.dumps(json_form,ensure_ascii=False)
+    j = json.dumps(json_form,ensure_ascii=False)
+    return json.loads(j)
 
 def get_max_summary(summary, max):
     if len(summary) > len(max):
@@ -247,6 +252,7 @@ def score_scaling(score, scale):
         score = tmp
     return str(score)
 
+#감독 파싱하기
 def get_actor(tree, actor_xpath):
     actor = tree.xpath(actor_xpath)
     actor = extract_actor(actor)
@@ -256,7 +262,7 @@ def extract_actor(a):
     actor_list = []
     for actor in a:
         actor_list.append(actor.text_content())
-    if len(actor_list) > 0 and actor_list[0] == '왓챠플레이':
+    if len(actor_list) > 0 and (actor_list[0] == '왓챠플레이' or actor_list[0] == 'TVING'):
         actor_list = actor_list[1:len(actor_list)]
     return actor_list
 
