@@ -53,8 +53,8 @@ def get_url(site_data, input_data):
 
     titles = tree.xpath(title_xpath)
     identifys = tree.xpath(identify_xpath)
-    candidate_list = []
 
+    candidate_list = []
     for i in range(0,len(titles)):
         candidate_title = titles[i].text_content()
         candidate_data = identifys[i].text_content()
@@ -69,6 +69,7 @@ def get_url(site_data, input_data):
     if match < max:
         if not(len(candidate_list) == 1 and match == max-1):
             raise match_error('match cnt is not full')
+
     if site_data['site_name'] == 'watcha':
         content_url = titles[index].getparent().getparent().getparent().attrib['href']
     else:
@@ -143,7 +144,7 @@ def make_json(uuid, list):
     import ast
     poster = ''
     max_summary = ''
-    max_actor = ['']
+    max_actor = [[],[]]
     title = ''
 
     site_info_list = []
@@ -175,11 +176,8 @@ def make_json(uuid, list):
 
     info_part = OrderedDict() #poster, actor, summary
     info_part['poster_url'] = poster
-    if len(max_actor) > 0:
-        info_part['director'] = max_actor[0]
-    else :
-        info_part['director'] = ''    
-    info_part['actor'] = max_actor
+    info_part['director'] = max_actor[0]
+    info_part['actor'] = max_actor[1]
     info_part['summary'] = max_summary
 
     data_part = OrderedDict()
@@ -200,7 +198,7 @@ def get_max_summary(summary, max):
     return max
 
 def get_max_actor(actor, max):
-    if len(actor) > len(max):
+    if len(actor[1]) > len(max[1]):
         max = actor
     return max
 
@@ -255,8 +253,15 @@ def score_scaling(score, scale):
 #감독 파싱하기
 def get_actor(tree, actor_xpath):
     actor = tree.xpath(actor_xpath)
-    actor = extract_actor(actor)
-    return actor
+    list = extract_actor(actor)
+    if len(list) > 0:
+        cnt = get_director_cnt(actor)
+        director_list = list[0:cnt]
+        actor_list = list[cnt:]
+        list = [director_list, actor_list]
+    else :
+        list = [[],[]]
+    return list
 
 def extract_actor(a):
     actor_list = []
@@ -265,6 +270,17 @@ def extract_actor(a):
     if len(actor_list) > 0 and (actor_list[0] == '왓챠플레이' or actor_list[0] == 'TVING'):
         actor_list = actor_list[1:len(actor_list)]
     return actor_list
+
+def get_director_cnt(a):
+    director_cnt = 0
+    node = a[len(a)-1]
+    while True:
+        if 'ul' in str(node):
+            all_info = node.text_content()
+            director_cnt = all_info.count('감독')
+            break
+        node = node.getparent()
+    return director_cnt
 
 def get_poster(tree, poster_xpath):
     poster = tree.xpath(poster_xpath)
@@ -300,7 +316,8 @@ def test():
     logging.basicConfig(filename='./log/test.log',format='%(asctime)s %(levelname)-8s %(message)s', level=logging.DEBUG , datefmt='%Y-%m-%d %H:%M:%S')
     category = 'movie'
     sites = read_site('all')
-    input = ['000|엑시트|한국|2019|2018']
+    #input = ['000|엑시트|한국|2019|2018']
+    input = ['000|매트릭스 3 - 레볼루션|미국|2003|2003']
     # 20182407|우리의 소원|한국||2018 #매치 에러 이거 해결 **
     # input = ['20192601|작은 방안의 소녀|한국||2018'] #스코어 에러 **
     for movie in input:
@@ -314,18 +331,19 @@ def test():
                 source_site = site['site_name']
                 source_id = get_source_id(content_url)
                 date = get_date()
-                recovery = request_recovery(movie, content_url, site)
+                recovery = request_recovery(category, movie, content_url, site)
 
-                print('source_site : ',source_site)
-                print('source_id : ',source_id)
-                print('date : ',date)
-                print('raw data : ',raw_data)
-                print('data : ',data)
-                print('recovery : ',recovery)
-                print('')
+                # print('source_site : ',source_site)
+                # print('source_id : ',source_id)
+                # print('date : ',date)
+                # print('raw data : ',raw_data)
+                # print('data : ',data)
+                # print('recovery : ',recovery)
+                # print('')
             except Exception as e:
                 logging.error('Exception while <'+ site['site_name']+'> searching <'+ movie +'> '+ str(e))
                 logging.exception('Got exception')
                 logging.error('**********************************')
                 continue
+
 #test()
