@@ -70,8 +70,8 @@ def get_identify(uuid_list): #uuid 튜플 리스트를 주면 identify 리스트
     identify_list = []
     for uuid in uuid_list:
         uuid = uuid[0]
-        ans = db_session.query(Rawdata.recovery).filter(Rawdata.uuid == uuid).first()
-        identify = ans[1]
+        ans = rawdata_db_session.query(Rawdata.recovery).filter(Rawdata.uuid == uuid).first()
+        identify = ans[0][1]
         identify_list.append(identify)
     rawdata_db_session.close()
     return [category, 'uuid_to_identify', identify_list]
@@ -150,7 +150,7 @@ def insert_refined(uuid_list):
     refine_db_session.close()
 
 def update_refined(uuid_list):
-    log_init('insert_refined'+crawler.get_date())
+    log_init('update_refined'+crawler.get_date())
     from sqlalchemy import and_
     from sqlalchemy.sql import func
 
@@ -171,7 +171,7 @@ def update_refined(uuid_list):
             ans = rawdata_db_session.query(Rawdata.source_site, Rawdata.data, Rawdata.recovery).filter(and_(Rawdata.date == sub.c.lastdate)).all()
             json_form = crawler.make_json(str(uuid),ans) #완성된 제이슨 데이터!
             refine = refine_db_session.query(RefinedData).filter(RefinedData.uuid == uuid).one()
-            refine.json = json_form
+            refine.data = json_form
             refine.update_date = func.now()
             refine_db_session.commit()
         except Exception as e:
@@ -191,15 +191,16 @@ def update_refined(uuid_list):
 
 
 # 전체 중복되지않은 raw_data의 uuid 가져오기 (select)
-#uulist = get_uuid_list_all('movie')
+#uuid_list = get_uuid_list_all('movie')
+#update_refined(uuid_list)
 
 ### 그냥 새로운 rawdata 처음으로 movie_list_ 에서 읽어와 채워 넣을 때 (insert)
-input = get_input_list('movie', 'movie_list_7')
-insert_rawdata(input)
+#input = get_input_list('movie', 'movie_list_20') ~>
+#insert_rawdata(input)
 
 # raw_data에는 있지만 refine 되지 않은 데이터를 refine 테이블에 채워 넣을 때 (insert)
-# uulist = get_uuid_not_exist('movie')
-# insert_refined(uulist)
+uulist = get_uuid_not_exist('movie')
+insert_refined(uulist)
 
 # 특정 날짜 조건의 uuid 리스트 가져오기 (ex) update date가 특정 시간 이하일 경우 가져온다) (select)
 #uuid_list = get_uuid_date_condition('movie')
@@ -212,12 +213,31 @@ insert_rawdata(input)
 
 # 비동기로 들어온 특정 rawdata에 대한 인서트 + refine에 해당 업데이터 반영 (update)
 #uuid_list = uuid 여기에 카테고리, 출처, uuid 순서로 감싸야됨
-#input = get_identify(uuid_list)
-#insert_rawdata(input)
+#uu = '5d25d66a-e51c-402e-995e-d761508b8b8b'
+#uuid_list = ['movie','gg',[((uu),)]]
+# input = get_identify(uuid_list)
+# insert_rawdata(input)
 #update_refined(uuid_list)
 
 # uuid를 통해서 이미 입력된 identify 가져오는 모듈 만들기
 #get_identify(uuid_list) 터플과 리스트로 둘러싼 uuid리스트
+
+# find json attrib query
+#SELECT *
+#FROM public.wiki_refineddata
+#WHERE public.wiki_refineddata.data -> 'data' ->> 'title' = '라이온 킹'
+
+# ** bulk update method!!
+# s = Session()
+# objects = [
+#     User(name="u1"),
+#     User(name="u2"),
+#     User(name="u3")
+# ]
+# s.bulk_save_objects(objects)
+# s.commit()
+
+
 
 #celery redis 모듈 작성하기
 #영화 리스트 감시하는 모듈 작성 필요
@@ -226,3 +246,5 @@ insert_rawdata(input)
 #포스터 유알엘 별도로 가져오는 모듈 #네이버가 안될 경우 필요함
 #현재 모든 모듈들에대한 테스트 코드 작성하기.. 계속 진행 ㄱㄱ
 #rawdata_movie 로 테이블 제작
+# sqlalchemy bulk update
+# maxmovie 매트릭스 레볼루션 같은 경우에 xpath에서 경로상의 div 위치가 바뀜! 따라서 검색이 되었음에도 영화 파트가 아닌 뉴스 파트에서 코드가 작동해 크롤링을 못해오는중
