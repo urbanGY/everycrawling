@@ -347,3 +347,71 @@ def test():
                 continue
 
 #test()
+def get_html_test():
+    naver_url = 'https://movie.naver.com/movie/bi/mi/pointWriteFormList.nhn?code=<SOURCE>&type=after&page=1'
+    total_xpath = '/html/body/div/div/div[4]/strong/em'
+    review_xpath = '/html/body/div/div/div[6]/ul/li[not(@*)]'
+
+    category = 'movie'
+    site = read_site('naver_movie')
+    input = ['000|엑시트|한국|2019|2018']
+    for movie in input:
+        content_url = get_url(site, movie)
+        source_id = get_source_id(content_url)
+        url = naver_url.replace("<SOURCE>",source_id)
+        page = requests.get(url, headers = get_header())
+        tree = html.fromstring(page.content)
+        total = tree.xpath(total_xpath)
+        for i in range(1,5):#int(total/10) + 1
+            url = url.replace('page=1','page='+str(i))
+            page = requests.get(url, headers = get_header())
+            tree = html.fromstring(page.content)
+            r = tree.xpath(review_xpath)
+            for li in r:
+                review = li.xpath('div/p') # 리뷰
+                score = li.xpath('div/em')
+                strong = li.xpath('div/strong/span')
+                print(review[0].text_content())
+                print(score[0].text_content())
+                print(strong[0].text_content())
+
+def ajax_header(refer):
+    headers = {'accept': 'application/vnd.frograms+json;version=20',
+    'Origin': 'https://watcha.com',
+    'Referer': refer,
+    'Sec-Fetch-Mode': 'cors',
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.132 Safari/537.36',
+    'x-watcha-client': 'watcha-WebApp',
+    'x-watcha-client-language': 'ko',
+    'x-watcha-client-region': 'KR',
+    'x-watcha-client-version': '1.0.0'}
+    return headers
+
+def test_watcha():
+    refer = 'https://watcha.com/ko-KR/contents/mdErj22/comments' #엑시트 댓글 담고있는 주소
+    ajax_url = 'https://api.watcha.com/api/contents/mdErj22/comments?default_version=20&filter=all&order=popular&page=<INDEX>&size=3&vendor_string=frogram'
+    index = 1
+    while True:
+        url = ajax_url.replace("<INDEX>",str(index))
+        index += 1;
+        req = requests.get(url, headers = ajax_header(refer)).text
+        json_data = json.loads(req)
+        result_part = json_data['result']
+        result_list = result_part['result']
+        for result in  result_list:
+            user = result['user']['name']
+            user_name = result['user']['name']
+            review = result['text']
+            date = result['created_at']
+            rating = result['user_content_action']['rating']
+            print('user : ',user_name)
+            print('review : ',review)
+            print('date : ',date)
+            print('rating : ',rating)
+            print('****')
+            #여기서 next uri가 null 인지 검사해서 정지하는 코드 삽입
+            #result_part['next_uri'] = null
+        if index == 3:
+            break
+
+test_watcha()
