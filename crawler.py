@@ -388,15 +388,20 @@ def ajax_header(refer):
     return headers
 
 def test_watcha():
-    refer = 'https://watcha.com/ko-KR/contents/mdErj22/comments' #엑시트 댓글 담고있는 주소
-    ajax_url = 'https://api.watcha.com/api/contents/mdErj22/comments?default_version=20&filter=all&order=popular&page=<INDEX>&size=3&vendor_string=frogram'
+    # refer = 'https://watcha.com/ko-KR/contents/mdErj22/comments' #엑시트 댓글 담고있는 주소
+    # ajax_url = 'https://api.watcha.com/api/contents/mdErj22/comments?default_version=20&filter=all&order=popular&page=<INDEX>&size=3&vendor_string=frogram'
+
+    refer = 'https://watcha.com/ko-KR/contents/byavDOx/comments'
+    ajax_url = 'https://api.watcha.com/api/contents/byavDOx/comments?default_version=20&filter=all&order=popular&page=<INDEX>&size=3&vendor_string=frograms'
     index = 1
     while True:
+        #sleep need??
         url = ajax_url.replace("<INDEX>",str(index))
         index += 1;
         req = requests.get(url, headers = ajax_header(refer)).text
         json_data = json.loads(req)
         result_part = json_data['result']
+        next = result_part['next_uri']
         result_list = result_part['result']
         for result in  result_list:
             user = result['user']['name']
@@ -411,7 +416,37 @@ def test_watcha():
             print('****')
             #여기서 next uri가 null 인지 검사해서 정지하는 코드 삽입
             #result_part['next_uri'] = null
-        if index == 3:
+        if next == None:
             break
 
-test_watcha()
+def test_daum():
+    daum_url = 'https://movie.daum.net/moviedb/grade?movieId=121137&type=netizen&page=1'
+
+    total_xpath = '//*[@id="mArticle"]/div[2]/div[2]/div[1]/div[1]/h4/span[1]'
+    li_xpath = '//*[@id="mArticle"]/div[2]/div[2]/div[1]/ul/li[@*]'
+
+    page = requests.get(daum_url,headers = get_header())
+    tree = html.fromstring(page.content)
+    total_elem = tree.xpath(total_xpath)
+    total = total_elem[0].text_content()
+    total = total.replace('(','')
+    total = total.replace(')','')
+    total = total.replace(',','')
+
+    daum_url = 'https://movie.daum.net/moviedb/grade?movieId=121137&type=netizen&page=<INDEX>'
+    for index in range(1,3):#range(1,int(total)/10+2):
+        url = daum_url.replace('<INDEX>',str(index))
+        page = requests.get(url,headers = get_header())
+        tree = html.fromstring(page.content)
+        li_elem = tree.xpath(li_xpath)
+        print(li_elem)
+        for li in li_elem:
+            user_name = li.xpath('div/a[1]/em')
+            review = li.xpath('div/p')
+            date = li.xpath('div/div[2]/span[1]')
+            rating = li.xpath('div/div[1]/em')
+            print('user : ',user_name[0].text_content())
+            print('review : ',review[0].text_content())
+            print('date : ',date[0].text_content())
+            print('rating : ',rating[0].text_content())
+            print('****')
