@@ -4,6 +4,7 @@ import json
 from collections import OrderedDict #for make json
 import datetime
 from time import sleep
+import re # regular expression
 #*********************************************************************
 # for load input data
 def read_site(name):
@@ -375,6 +376,53 @@ def get_html_test():
                 print(score[0].text_content())
                 print(strong[0].text_content())
 
+def test_naver():
+    naver_url = 'https://movie.naver.com/movie/bi/mi/review.nhn?code=174903&page=<INDEX>'
+    detail_url = 'https://movie.naver.com/movie/bi/mi/reviewread.nhn?nid=<NID>&code=174903&order=#tab'
+
+    total_xpath = '//*[@id="reviewTab"]/div/div/div[2]/span/em/text()'
+    li_xpath = '//*[@id="reviewTab"]/div/div/ul/li[not(@*)]'
+
+
+
+
+    total_url = naver_url.replace('<INDEX>','1')
+    page = requests.get(total_url,headers = get_header())
+    tree = html.fromstring(page.content)
+    total = tree.xpath(total_xpath)
+    total = int(total[0])
+
+    for index in range(1,2): #total//10 + 1
+        url = naver_url.replace('<INDEX>',str(index))
+        page = requests.get(url,headers = get_header())
+        tree = html.fromstring(page.content)
+        li_elem = tree.xpath(li_xpath)
+        for li in li_elem:
+            anchor = li.xpath('a')
+            a = anchor[0].attrib['onclick']
+            nid = re.findall("\d+", a)
+            nid = str(nid[0])
+            d_url = detail_url.replace('<NID>',nid)
+            page = requests.get(d_url,headers = get_header())
+            tree = html.fromstring(page.content)
+
+            user_name = tree.xpath('//*[@id="content"]/div[1]/div[4]/div[1]/div[3]/ul/li[not(@*)]/a/em')
+            review = tree.xpath('//*[@id="content"]/div[1]/div[4]/div[1]/div[4]')
+            date = tree.xpath('//*[@id="content"]/div[1]/div[4]/div[1]/div[2]/span')
+            rating = tree.xpath('//*[@id="content"]/div[1]/div[4]/div[1]/div[2]/div/em')
+            print('user : ',user_name[len(user_name)-1].text_content())
+            print('review : ',review[0].text_content())
+            print('date : ',date[0].text_content())
+            try:
+                print('rating : ',rating[0].text_content())
+            except:
+                print('rating : none')
+            print('****')
+
+test_naver()
+
+
+
 def ajax_header(refer):
     headers = {'accept': 'application/vnd.frograms+json;version=20',
     'Origin': 'https://watcha.com',
@@ -420,20 +468,21 @@ def test_watcha():
             break
 
 def test_daum():
-    daum_url = 'https://movie.daum.net/moviedb/grade?movieId=121137&type=netizen&page=1'
+    daum_url = 'https://movie.daum.net/moviedb/grade?movieId=121137&type=netizen&page=<INDEX>'
 
     total_xpath = '//*[@id="mArticle"]/div[2]/div[2]/div[1]/div[1]/h4/span[1]'
     li_xpath = '//*[@id="mArticle"]/div[2]/div[2]/div[1]/ul/li[@*]'
 
-    page = requests.get(daum_url,headers = get_header())
+    total_url = daum_url.replace('<INDEX>','1')
+    page = requests.get(total_url,headers = get_header())
     tree = html.fromstring(page.content)
     total_elem = tree.xpath(total_xpath)
     total = total_elem[0].text_content()
     total = total.replace('(','')
     total = total.replace(')','')
     total = total.replace(',','')
+    total = int(total)
 
-    daum_url = 'https://movie.daum.net/moviedb/grade?movieId=121137&type=netizen&page=<INDEX>'
     for index in range(1,3):#range(1,int(total)/10+2):
         url = daum_url.replace('<INDEX>',str(index))
         page = requests.get(url,headers = get_header())
@@ -446,6 +495,37 @@ def test_daum():
             date = li.xpath('div/div[2]/span[1]')
             rating = li.xpath('div/div[1]/em')
             print('user : ',user_name[0].text_content())
+            print('review : ',review[0].text_content())
+            print('date : ',date[0].text_content())
+            print('rating : ',rating[0].text_content())
+            print('****')
+
+def test_maxmovie():
+    max_url = 'http://www.maxmovie.com/Movie/M000106709/talk?size=10&no=<INDEX>'
+
+    total_xpath = '//*[@id="content"]/div[1]/div[2]/div[3]/div[2]/div/ul/li[1]/a/em'
+    li_xpath = '//*[@id="content"]/div[1]/div[2]/div[3]/div[2]/ul/li[@*]'
+
+
+    total_url = max_url.replace('<INDEX>','1')
+    page = requests.get(total_url,headers = get_header())
+    tree = html.fromstring(page.content)
+    total_elem = tree.xpath(total_xpath)
+    total = total_elem[0].text_content()
+    total = int(total)
+
+    for index in range(1,3):#range(1,int(total)/10+2):
+        url = max_url.replace('<INDEX>',str(index))
+        page = requests.get(url,headers = get_header())
+        tree = html.fromstring(page.content)
+        li_elem = tree.xpath(li_xpath)
+        print(li_elem)
+        for li in li_elem:
+            user_name = li.xpath('div/div/p[1]/text()')
+            review = li.xpath('div/div/p[2]')
+            date = li.xpath('div/div/p[1]/span')
+            rating = li.xpath('div/p/span[2]')
+            print('user : ',user_name)
             print('review : ',review[0].text_content())
             print('date : ',date[0].text_content())
             print('rating : ',rating[0].text_content())
