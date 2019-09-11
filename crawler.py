@@ -376,15 +376,14 @@ def get_html_test():
                 print(score[0].text_content())
                 print(strong[0].text_content())
 
-def test_naver():
-    naver_url = 'https://movie.naver.com/movie/bi/mi/review.nhn?code=174903&page=<INDEX>'
-    detail_url = 'https://movie.naver.com/movie/bi/mi/reviewread.nhn?nid=<NID>&code=174903&order=#tab'
+def test_naver(source_id):
+    naver_url = 'https://movie.naver.com/movie/bi/mi/review.nhn?code=<SOURCE_ID>&page=<INDEX>'
+    detail_url = 'https://movie.naver.com/movie/bi/mi/reviewread.nhn?nid=<NID>&code=<SOURCE_ID>&order=#tab'
+    naver_url = naver_url.replace('<SOURCE_ID>',source_id)
+    detail_url = detail_url.replace('<SOURCE_ID>',source_id)
 
     total_xpath = '//*[@id="reviewTab"]/div/div/div[2]/span/em/text()'
     li_xpath = '//*[@id="reviewTab"]/div/div/ul/li[not(@*)]'
-
-
-
 
     total_url = naver_url.replace('<INDEX>','1')
     page = requests.get(total_url,headers = get_header())
@@ -417,9 +416,8 @@ def test_naver():
                 print('rating : ',rating[0].text_content())
             except:
                 print('rating : none')
-            print('****')
+            print('************************************************************\n')
 
-test_naver()
 
 
 
@@ -435,12 +433,16 @@ def ajax_header(refer):
     'x-watcha-client-version': '1.0.0'}
     return headers
 
-def test_watcha():
+def test_watcha(source_id):
     # refer = 'https://watcha.com/ko-KR/contents/mdErj22/comments' #엑시트 댓글 담고있는 주소
     # ajax_url = 'https://api.watcha.com/api/contents/mdErj22/comments?default_version=20&filter=all&order=popular&page=<INDEX>&size=3&vendor_string=frogram'
 
-    refer = 'https://watcha.com/ko-KR/contents/byavDOx/comments'
-    ajax_url = 'https://api.watcha.com/api/contents/byavDOx/comments?default_version=20&filter=all&order=popular&page=<INDEX>&size=3&vendor_string=frograms'
+    refer = 'https://watcha.com/ko-KR/contents/<SOURCE_ID>/comments'
+    ajax_url = 'https://api.watcha.com/api/contents/<SOURCE_ID>/comments?default_version=20&filter=all&order=popular&page=<INDEX>&size=3&vendor_string=frograms'
+
+    refer = refer.replace('<SOURCE_ID>',source_id)
+    ajax_url = ajax_url.replace('<SOURCE_ID>',source_id)
+
     index = 1
     while True:
         #sleep need??
@@ -461,14 +463,15 @@ def test_watcha():
             print('review : ',review)
             print('date : ',date)
             print('rating : ',rating)
-            print('****')
+            print('************************************************************\n')
             #여기서 next uri가 null 인지 검사해서 정지하는 코드 삽입
             #result_part['next_uri'] = null
         if next == None:
             break
 
-def test_daum():
-    daum_url = 'https://movie.daum.net/moviedb/grade?movieId=121137&type=netizen&page=<INDEX>'
+def test_daum(source_id):
+    daum_url = 'https://movie.daum.net/moviedb/grade?movieId=<SOURCE_ID>&type=netizen&page=<INDEX>'
+    daum_url = daum_url.replace('<SOURCE_ID>',source_id)
 
     total_xpath = '//*[@id="mArticle"]/div[2]/div[2]/div[1]/div[1]/h4/span[1]'
     li_xpath = '//*[@id="mArticle"]/div[2]/div[2]/div[1]/ul/li[@*]'
@@ -483,12 +486,11 @@ def test_daum():
     total = total.replace(',','')
     total = int(total)
 
-    for index in range(1,3):#range(1,int(total)/10+2):
+    for index in range(1,2):#range(1,int(total)/10+2):
         url = daum_url.replace('<INDEX>',str(index))
         page = requests.get(url,headers = get_header())
         tree = html.fromstring(page.content)
         li_elem = tree.xpath(li_xpath)
-        print(li_elem)
         for li in li_elem:
             user_name = li.xpath('div/a[1]/em')
             review = li.xpath('div/p')
@@ -498,10 +500,12 @@ def test_daum():
             print('review : ',review[0].text_content())
             print('date : ',date[0].text_content())
             print('rating : ',rating[0].text_content())
-            print('****')
+            print('************************************************************\n')
 
-def test_maxmovie():
-    max_url = 'http://www.maxmovie.com/Movie/M000106709/talk?size=10&no=<INDEX>'
+
+def test_maxmovie(source_id):
+    max_url = 'http://www.maxmovie.com/Movie/<SOURCE_ID>/talk?size=10&no=<INDEX>'
+    max_url = max_url.replace('<SOURCE_ID>',source_id)
 
     total_xpath = '//*[@id="content"]/div[1]/div[2]/div[3]/div[2]/div/ul/li[1]/a/em'
     li_xpath = '//*[@id="content"]/div[1]/div[2]/div[3]/div[2]/ul/li[@*]'
@@ -514,7 +518,7 @@ def test_maxmovie():
     total = total_elem[0].text_content()
     total = int(total)
 
-    for index in range(1,3):#range(1,int(total)/10+2):
+    for index in range(1,2):#range(1,int(total)/10+2):
         url = max_url.replace('<INDEX>',str(index))
         page = requests.get(url,headers = get_header())
         tree = html.fromstring(page.content)
@@ -522,6 +526,7 @@ def test_maxmovie():
         print(li_elem)
         for li in li_elem:
             user_name = li.xpath('div/div/p[1]/text()')
+            user_name = remove_blank(user_name[0])
             review = li.xpath('div/div/p[2]')
             date = li.xpath('div/div/p[1]/span')
             rating = li.xpath('div/p/span[2]')
@@ -529,4 +534,16 @@ def test_maxmovie():
             print('review : ',review[0].text_content())
             print('date : ',date[0].text_content())
             print('rating : ',rating[0].text_content())
-            print('****')
+            print('************************************************************\n')
+
+
+#max movie M000106709
+#daum 121137
+#naver 174903
+test_maxmovie('M000106709')
+# test_daum('121137')
+# test_naver('174903')
+
+
+#watcha byavDOx 이건 10개짜리
+# test_watcha('byavDOx')
