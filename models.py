@@ -3,8 +3,8 @@ from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.sql import func
 from db.db_setting import Base
 
-class Rawdata(Base):
-    __tablename__ = 'rawdata'
+class Rawdata_movie(Base):
+    __tablename__ = 'rawdata_movie'
 
     uuid = Column(UUID(as_uuid=True), primary_key=True)
     date = Column(DateTime(timezone=True), default=func.now(), primary_key=True)
@@ -23,6 +23,28 @@ class Rawdata(Base):
 
     def __repr__(self):
         return "<User('%s', '%s', '%s', '%s', '%s', '%s')>" % (self.uuid, self.date, self.source_site, self.source_id, self.data, self.recovery)
+
+class Review_movie(Base):
+    __tablename__ = 'review_movie'
+
+    review_id = Column(Integer, primary_key=True )
+    uuid = Column(UUID(as_uuid=True))
+    source_site = Column(String(20))
+    source_id = Column(String(32), primary_key=True)
+    user_name = Column(String(20))
+    date = Column(String(32))
+    review = Column(String)
+    rating = Column(String(10))
+
+    def __init__(self, review_id, uuid, source_site, source_id, user_name, date, review, rating):
+        self.review_id = review_id
+        self.uuid = uuid
+        self.source_site = source_site
+        self.source_id = source_id
+        self.user_name = user_name
+        self.date = date
+        self.review = review
+        self.rating = rating
 
 #wiki_refineddata
 class RefinedData(Base):
