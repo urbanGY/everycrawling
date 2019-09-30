@@ -283,10 +283,18 @@ def get_director_cnt(a):
         node = node.getparent()
     return director_cnt
 
+def remove_poster_query(url):
+    for i in range(len(url)-1,0,-1):
+        if url[i] == '?':
+            break
+    url = url[0:i]
+    return url
+
 def get_poster(tree, poster_xpath):
     poster = tree.xpath(poster_xpath)
     try:
         poster = poster[0].attrib['src']
+        poster = remove_poster_query(poster)
     except:
         poster = 'poster not exist'
     return poster
@@ -448,10 +456,20 @@ def ajax_header(refer):
     'x-watcha-client': 'watcha-WebApp',
     'x-watcha-client-language': 'ko',
     'x-watcha-client-region': 'KR',
-    'x-watcha-client-version': '1.0.0'}
+    'x-watcha-client-version': '1.0.0',
+    'x-watcha-remote-addr': '121.140.163.199'}
     return headers
 
-def get_watcha_review(source_id):
+def ajax_param(page):
+    param = {'default_version': '20',
+    'filter': 'all',
+    'order': 'popular',
+    'page': page,
+    'size': '3',
+    'vendor_string': 'frograms'}
+    return param
+
+def get_watcha_inside(source_id, index):
     # refer = 'https://watcha.com/ko-KR/contents/mdErj22/comments' #엑시트 댓글 담고있는 주소
     # ajax_url = 'https://api.watcha.com/api/contents/mdErj22/comments?default_version=20&filter=all&order=popular&page=<INDEX>&size=3&vendor_string=frogram'
 
@@ -461,29 +479,41 @@ def get_watcha_review(source_id):
     refer = refer.replace('<SOURCE_ID>',source_id)
     ajax_url = ajax_url.replace('<SOURCE_ID>',source_id)
 
-    index = 1
     review_list = []
     while True:
-        if index % 4 == 0:
+        if index % 3 == 0:
             sleep(1)
         #sleep need??
         url = ajax_url.replace("<INDEX>",str(index))
-        index += 1;
-        req = requests.get(url, headers = ajax_header(refer)).text
-        json_data = json.loads(req)
-        result_part = json_data['result']
-        next = result_part['next_uri']
-        if next == None:
+        with requests.Session() as s:
+            req = s.get(url, headers = ajax_header(refer), params = ajax_param(str(index))).text
+            s.keep_alive = False
+            index += 1;
+            json_data = json.loads(req)
+            result_part = json_data['result']
+            result_list = result_part['result']
+            for result in  result_list:
+                user = result['user']['name']
+                user_name = result['user']['name']
+                review = result['text']
+                date = result['created_at']
+                rating = result['user_content_action']['rating']
+                tmp = [user_name, review, date, rating]
+                review_list.append(tmp)
+            if len(result_list) < 3:
+                break
+    return review_list
+
+def get_watcha_review(source_id):
+    index = 1
+    review_list = []
+    while True:
+        list = get_watcha_inside(source_id, index)
+        for elem in list:
+            review_list.append(elem)
+        index += 6
+        if len(list) < 18:
             break
-        result_list = result_part['result']
-        for result in  result_list:
-            user = result['user']['name']
-            user_name = result['user']['name']
-            review = result['text']
-            date = result['created_at']
-            rating = result['user_content_action']['rating']
-            tmp = [user_name, review, date, rating]
-            review_list.append(tmp)
     return review_list
             # print('user : ',user_name)
             # print('review : ',review)
@@ -493,12 +523,20 @@ def get_watcha_review(source_id):
             #여기서 next uri가 null 인지 검사해서 정지하는 코드 삽입
             #result_part['next_uri'] = null
 
-
+def get_total(total_string):
+    total = ''
+    for c in total_string:
+        if c == ')':
+            break
+        if '0' <= c <= '9':
+            total += c
+    return total
+#TODO : daum 은 토탈 받아오기 다시해야할듯
 def get_daum_review(source_id):
     daum_url = 'https://movie.daum.net/moviedb/grade?movieId=<SOURCE_ID>&type=netizen&page=<INDEX>'
     daum_url = daum_url.replace('<SOURCE_ID>',source_id)
 
-    total_xpath = '//*[@id="mArticle"]/div[2]/div[2]/div[1]/div[1]/h4/span[1]'
+    total_xpath = '//*[@id="mArticle"]/div[2]/div[2]/div[1]/div[1]'
     li_xpath = '//*[@id="mArticle"]/div[2]/div[2]/div[1]/ul/li[@*]'
 
     total_url = daum_url.replace('<INDEX>','1')
@@ -507,9 +545,7 @@ def get_daum_review(source_id):
     total_elem = tree.xpath(total_xpath)
     try:
         total = total_elem[0].text_content()
-        total = total.replace('(','')
-        total = total.replace(')','')
-        total = total.replace(',','')
+        total = get_total(total)
     except:
         total = '0'
     review_list = []
@@ -526,6 +562,8 @@ def get_daum_review(source_id):
             date = li.xpath('div/div[2]/span[1]')
             rating = li.xpath('div/div[1]/em')
             user_name = user_name[0].text_content()
+            if len(user_name) > 20:
+                user_name = user_name[0:20]
             review = review[0].text_content()
             review = remove_blank(review)
             date = date[0].text_content()
@@ -589,12 +627,11 @@ def get_maxmovie_review(source_id):
             # print('rating : ',rating[0].text_content())
             # print('************************************************************\n')
 #TODO : 중복 pk가 중복되서 안들어 가는 경우가 있다;
-
 #max movie M000106709
 #daum 121137
 #naver 174903
 #test_maxmovie('M000106709')
-# test_daum('121137')
+#test_daum('121137')
 # test_naver('174903')
 # r = get_maxmovie_review('M000109052')
 # r = get_watcha_review('m5m1wp7')
