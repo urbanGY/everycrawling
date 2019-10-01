@@ -10,7 +10,7 @@ import json
 
 def create_table():
     engine = db_setting.get_rawdata_engine()
-    db_setting.create_rawdata_table(engine)
+    # db_setting.create_rawdata_table(engine)
     db_setting.create_review_table(engine)
 
 
@@ -41,6 +41,19 @@ def get_uuid_refine(category): #refine 테이블에 있는 모든 uuid를 가져
     refine_engine = db_setting.get_refineddata_engine()
     refine_db_session = db_setting.get_sesstion(refine_engine)
     uuid_list = refine_db_session.query(RefinedData.uuid).all()
+    refine_db_session.close()
+    return [category, 'from get_uuid_refine', uuid_list]
+
+def get_uuid_refine_notexist_review(category):
+    from sqlalchemy.sql import func
+    refine_engine = db_setting.get_refineddata_engine()
+    refine_db_session = db_setting.get_sesstion(refine_engine)
+    rawdata_engine = db_setting.get_rawdata_engine() # create connection to crawling db
+    rawdata_db_session = db_setting.get_sesstion(rawdata_engine) #create session
+
+    sub = rawdata_db_session.query(Rawdata_movie.uuid).group_by(Rawdata_movie.uuid).all()
+    uuid_list = refine_db_session.query(RefinedData.uuid).filter(RefinedData.uuid.notin_(sub)).all()
+    rawdata_db_session.close()
     refine_db_session.close()
     return [category, 'from get_uuid_refine', uuid_list]
 
@@ -204,18 +217,19 @@ def update_refined(uuid_list):
     rawdata_db_session.close()
     refine_db_session.close()
 
-def insert_review_test(category):
+def insert_review_test(category, source_site):
+    from sqlalchemy import and_
+    log_init('insert_review_test'+crawler.get_date())
     rawdata_engine = db_setting.get_rawdata_engine() # create connection to crawling db
     rawdata_db_session = db_setting.get_sesstion(rawdata_engine) #create session
 
-    elem = get_uuid_refine(category)
+    elem = get_uuid_refine_notexist_review(category)
     uuid_list = elem[2] #[(UUID('asdfasdf',)),(UUID('asdfasdf',))] 이런꼴로 나옴
     for uuid in uuid_list:
         uuid = uuid[0]
-        source_list = rawdata_db_session.query(Rawdata_movie.source_site, Rawdata_movie.source_id).filter(Rawdata_movie.uuid == uuid).all()
+        source_list = rawdata_db_session.query(Rawdata_movie.source_id).filter(and_(Rawdata_movie.uuid == uuid, Rawdata_movie.source_site == source_site)).group_by(Rawdata_movie.source_id).all() #쿼리 수정, 디비백업 쉘스크립트
         for source in source_list:
-            source_site = source[0]
-            source_id = source[1]
+            source_id = source[0]
             if source_site == 'naver_movie':
                 review_list = crawler.get_naver_review(source_id)
             elif source_site == 'watcha':
@@ -224,14 +238,33 @@ def insert_review_test(category):
                 review_list = crawler.get_daum_review(source_id)
             elif source_site == 'maxmovie':
                 review_list = crawler.get_maxmovie_review(source_id)
-            for data in review_list:                
+            bulk_object = []
+            review_id = 0
+            for data in review_list:
+                review_id += 1
                 user_name = data[0]
                 review = data[1]
                 date = data[2]
                 rating = data[3]
-                entry = Review_movie(uuid = uuid, source_site = source_site, source_id = source_id, user_name = user_name, date = date, review = review, rating = rating )#remove date
-                rawdata_db_session.add(entry)
+                entry = Review_movie(review_id = review_id, uuid = uuid, source_site = source_site, source_id = source_id, user_name = user_name, date = date, review = review, rating = rating )#remove date
+                # try:
+                #     rawdata_db_session.add(entry)
+                #     rawdata_db_session.commit()
+                # except Exception as e:
+                #     logging.error('In uuid :  '+str(uuid)+' Exception ' + str(e))
+                #     logging.exception('Got exception.. ')
+                #     logging.error('**********************************')
+                #     continue
+                bulk_object.append(entry)
+            try :
+                rawdata_db_session.bulk_save_objects(bulk_object)
                 rawdata_db_session.commit()
+            except Exception as e:
+                logging.error('In uuid :  '+str(uuid)+' Exception ' + str(e))
+                logging.exception('Got exception.. ')
+                logging.error('**********************************')
+                continue
+
     rawdata_db_session.close()
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -242,14 +275,14 @@ def insert_review_test(category):
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 #테이블 만들기
-#create_table()
+create_table()
 
 # 전체 중복되지않은 raw_data의 uuid 가져오기 (select)
 #uuid_list = get_uuid_list_all('movie')
 #update_refined(uuid_list)
 
 ### 그냥 새로운 rawdata 처음으로 movie_list_ 에서 읽어와 채워 넣을 때 (insert)
-# for i in range(2,10):
+# for i in range(30,50):
 #     file = 'movie_list_'+str(i)
 #     input = get_input_list('movie', file)
 #     insert_rawdata(input)
@@ -285,7 +318,10 @@ def insert_review_test(category):
 # t_uuid = uuid_list[0][0]
 # source_list = get_source_and_id(t_uuid)
 # print(source_list)
-insert_review_test('movie')
+#insert_review_test('movie','naver_movie')
+#insert_review_test('movie','watcha')
+#insert_review_test('movie','daum_movie')
+#insert_review_test('movie','maxmovie')
 
 # find json attrib query
 #SELECT *
